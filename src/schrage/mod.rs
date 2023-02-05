@@ -36,7 +36,7 @@
 //!
 //!
 
-use crate::jobs::{Job, JobList, SchrageJobTable};
+use crate::jobs::{Job, JobList};
 use std::{cmp, vec};
 
 /// Schrage algorithm.
@@ -52,9 +52,9 @@ use std::{cmp, vec};
 /// # Examples
 ///
 /// ```rust
-/// use proc_opt::jobs::{JobList, Job, SchrageJobTable};
+/// use proc_opt::jobs::{JobList, Job};
 /// use proc_opt::schrage::schrage;
-/// let expected_result = SchrageJobTable::new(JobList {
+/// let expected_result = JobList {
 ///     jobs: vec![
 ///         Job::new(0, 6, 17),  // 6
 ///         Job::new(10, 5, 7),  // 1
@@ -64,8 +64,8 @@ use std::{cmp, vec};
 ///         Job::new(30, 3, 8),  // 5
 ///         Job::new(30, 2, 0),  // 7
 ///     ],
-/// });
-/// let js = SchrageJobTable::new(JobList {
+/// };
+/// let js = JobList {
 ///     jobs: vec![
 ///         Job::new(10, 5, 7),  // 1
 ///         Job::new(13, 6, 26), // 2
@@ -75,12 +75,12 @@ use std::{cmp, vec};
 ///         Job::new(0, 6, 17),  // 6
 ///         Job::new(30, 2, 0),  // 7
 ///     ],
-/// });
-/// let result = schrage(&js.job_list);
-/// assert_eq!(result.job_list, expected_result.job_list);
+/// };
+/// let result = schrage(&js);
+/// assert_eq!(result, expected_result);
 /// assert_eq!(result.c_max(), 53);
 /// ```
-pub fn schrage(jobs: &JobList) -> SchrageJobTable {
+pub fn schrage(jobs: &JobList) -> JobList {
     // N
     // A list of jobs to be completed
     let mut shortest_delivery_jobs = JobList::new(jobs.sorted_by_delivery_time());
@@ -120,7 +120,7 @@ pub fn schrage(jobs: &JobList) -> SchrageJobTable {
             t = shortest_delivery_jobs.jobs[0].delivery_time;
         }
     }
-    SchrageJobTable { job_list: pi }
+    pi
 }
 
 /// Part time Schrage algorithm.
@@ -132,7 +132,7 @@ pub fn schrage(jobs: &JobList) -> SchrageJobTable {
 /// # Example
 ///
 /// ```
-/// use proc_opt::jobs::{JobList, Job, SchrageJobTable};
+/// use proc_opt::jobs::{JobList, Job};
 /// use proc_opt::schrage::part_time_schrage;
 /// let js = JobList::new(vec![
 ///     Job::new(0, 27, 78),
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_schrage_ex1() {
-        let expected_result = SchrageJobTable::new(JobList {
+        let expected_result = JobList {
             jobs: vec![
                 Job::new(0, 6, 17),  // 6
                 Job::new(10, 5, 7),  // 1
@@ -212,8 +212,8 @@ mod tests {
                 Job::new(30, 3, 8),  // 5
                 Job::new(30, 2, 0),  // 7
             ],
-        });
-        let js = SchrageJobTable::new(JobList {
+        };
+        let js = JobList {
             jobs: vec![
                 Job::new(10, 5, 7),  // 1
                 Job::new(13, 6, 26), // 2
@@ -223,15 +223,15 @@ mod tests {
                 Job::new(0, 6, 17),  // 6
                 Job::new(30, 2, 0),  // 7
             ],
-        });
-        let result = schrage(&js.job_list);
-        assert_eq!(result.job_list, expected_result.job_list);
+        };
+        let result = schrage(&js);
+        assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 53);
     }
 
     #[test]
     fn test_schrage_ex2() {
-        let expected_result = SchrageJobTable::new(JobList {
+        let expected_result = JobList {
             jobs: vec![
                 Job::new(1, 5, 9), // 1
                 Job::new(3, 6, 8), // 5
@@ -240,8 +240,8 @@ mod tests {
                 Job::new(7, 3, 3), // 4
                 Job::new(4, 7, 1), // 6
             ],
-        });
-        let js = SchrageJobTable::new(JobList {
+        };
+        let js = JobList {
             jobs: vec![
                 Job::new(1, 5, 9), // 1
                 Job::new(4, 5, 4), // 2
@@ -250,15 +250,15 @@ mod tests {
                 Job::new(3, 6, 8), // 5
                 Job::new(4, 7, 1), // 6
             ],
-        });
-        let result = schrage(&js.job_list);
-        assert_eq!(result.job_list, expected_result.job_list);
+        };
+        let result = schrage(&js);
+        assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 32);
     }
 
     #[test]
     fn test_schrage_ex3() {
-        let expected_result = SchrageJobTable::new(JobList {
+        let expected_result = JobList {
             jobs: vec![
                 Job::new(15, 86, 700),  // 5
                 Job::new(51, 52, 403),  // 7
@@ -281,8 +281,8 @@ mod tests {
                 Job::new(57, 21, 76),   // 12
                 Job::new(233, 68, 23),  // 8
             ],
-        });
-        let js = SchrageJobTable::new(JobList {
+        };
+        let js = JobList {
             jobs: vec![
                 Job::new(162, 52, 241), // 1
                 Job::new(103, 68, 470), // 2
@@ -305,15 +305,15 @@ mod tests {
                 Job::new(715, 8, 93),   // 19
                 Job::new(598, 45, 200), // 20
             ],
-        });
-        let result = schrage(&js.job_list);
-        assert_eq!(result.job_list, expected_result.job_list);
+        };
+        let result = schrage(&js);
+        assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 1399);
     }
 
     #[test]
     fn test_schrage_ex4() {
-        let expected_result = SchrageJobTable::new(JobList {
+        let expected_result = JobList {
             jobs: vec![
                 Job::new(2, 20, 88),   // 8
                 Job::new(5, 14, 125),  // 4
@@ -326,8 +326,8 @@ mod tests {
                 Job::new(112, 22, 79), // 3
                 Job::new(90, 2, 13),   // 7
             ],
-        });
-        let js = SchrageJobTable::new(JobList {
+        };
+        let js = JobList {
             jobs: vec![
                 Job::new(52, 1, 56),   // 1
                 Job::new(70, 4, 93),   // 2
@@ -340,9 +340,9 @@ mod tests {
                 Job::new(52, 20, 56),  // 9
                 Job::new(9, 28, 94),   // 10
             ],
-        });
-        let result = schrage(&js.job_list);
-        assert_eq!(result.job_list, expected_result.job_list);
+        };
+        let result = schrage(&js);
+        assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 213);
     }
 
