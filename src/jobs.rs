@@ -93,23 +93,18 @@ impl JobList {
 
     /// Returns the makespan of this JobList (if all jobs are executed on a single machine).
     pub fn c_max(&self) -> u32 {
-        let mut end_times = vec![0; self.jobs.len()];
-        let mut s = 0;
-        let mut sums = vec![0; self.jobs.len()];
+        let mut makespan = 0;
+        let mut s = 0; // current time
 
-        for (i, job) in self.jobs.iter().enumerate() {
+        for job in self.jobs.iter() {
             if job.delivery_time > s {
                 s = job.delivery_time + job.processing_time;
             } else {
                 s += job.processing_time;
             }
-            end_times[i] = s;
+            makespan = std::cmp::max(makespan, s + job.cooldown_time);
         }
-
-        for (i, job) in self.jobs.iter().enumerate() {
-            sums[i] = job.cooldown_time + end_times[i];
-        }
-        *sums.iter().max().unwrap()
+        makespan
     }
 }
 
