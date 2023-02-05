@@ -64,29 +64,20 @@ pub fn schrage(jobs: &JobList) -> SchrageJobTable {
         {
             ready_to_run
                 .jobs
-                .append(&mut vec![shortest_delivery_jobs.jobs[0]]);
-            shortest_delivery_jobs.jobs.remove(0);
+                .push(shortest_delivery_jobs.jobs.remove(0));
         }
         // If there are jobs that are ready to run schedule them
         if !ready_to_run.jobs.is_empty() {
-            let vec_by_processing_time = JobList {
-                jobs: ready_to_run.sorted_by_processing_time(),
-            };
-            let reversed: JobList = JobList {
-                jobs: vec_by_processing_time.jobs.into_iter().rev().collect(),
-            };
-            let cooldown_times: Vec<Job> = reversed.sorted_by_cooldown_time();
+            let max_cooldown_time = ready_to_run.jobs.iter().map(|job| job.cooldown_time).max().unwrap();
+            let index_to_run = ready_to_run.jobs.iter().enumerate()
+                .filter(|(_i, job)| job.cooldown_time == max_cooldown_time)
+                .max_by_key(|(_i, job)| job.processing_time)
+                .map(|(i, _job)| i).unwrap();
 
-            let max_cooldown_time = cooldown_times.last().unwrap();
-            let position = ready_to_run
-                .jobs
-                .iter()
-                .position(|&n| &n == max_cooldown_time)
-                .unwrap();
-            ready_to_run.jobs.remove(position);
+            let job_to_run = ready_to_run.jobs.swap_remove(index_to_run);
             // Add a job to the final sequence
-            pi.jobs.push(*max_cooldown_time);
-            t += max_cooldown_time.processing_time;
+            pi.jobs.push(job_to_run);
+            t += job_to_run.processing_time;
         } else {
             // If there aren't any jobs that can be run,
             // skip to when the nearest job is available
@@ -296,8 +287,8 @@ mod tests {
                 Job::new(9, 28, 94),   // 10
                 Job::new(70, 4, 93),   // 2
                 Job::new(71, 7, 71),   // 6
-                Job::new(52, 1, 56),   // 1
                 Job::new(52, 20, 56),  // 9
+                Job::new(52, 1, 56),   // 1
                 Job::new(112, 22, 79), // 3
                 Job::new(90, 2, 13),   // 7
             ],
