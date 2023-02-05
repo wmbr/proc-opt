@@ -327,14 +327,16 @@ mod tests {
                 Job::new(30, 2, 0),  // 7
             ],
         };
-        println!("Before sort: {}", js);
-        println!(
-            "After sort: {}",
-            JobList {
-                jobs: js.sorted_by_cooldown_time()
-            }
-        );
-        assert_eq!(true, true);
+        let expected = vec![
+                Job::new(30, 2, 0),  // 7
+                Job::new(10, 5, 7),  // 1
+                Job::new(30, 3, 8),  // 5
+                Job::new(0, 6, 17),  // 6
+                Job::new(20, 4, 21), // 4
+                Job::new(11, 7, 24), // 3
+                Job::new(13, 6, 26), // 2
+        ];
+        assert_eq!(js.sorted_by_cooldown_time(), expected);
     }
 
     #[test]
