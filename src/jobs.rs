@@ -1,9 +1,23 @@
+//! Implements Job structs used for processing data by scheduling algorithms.
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
+//!
 use std::collections::HashMap;
 use std::{fmt, vec};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Job {
-    pub delivery_time: u32,   // r, commonly referred to as "release time"
+    pub delivery_time: u32,   // r
     pub processing_time: u32, // p
     pub cooldown_time: u32,   // q
 }
