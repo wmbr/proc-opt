@@ -12,8 +12,7 @@
 //!
 //!
 //!
-use std::collections::HashMap;
-use std::{fmt, vec};
+use std::{fmt, vec, cmp::max};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Job {
@@ -102,36 +101,46 @@ impl JobList {
             } else {
                 s += job.processing_time;
             }
-            makespan = std::cmp::max(makespan, s + job.cooldown_time);
+            makespan = max(makespan, s + job.cooldown_time);
         }
         makespan
     }
 }
 
-pub struct PartTimeSchrageJobTable {
-    pub job_list: JobList,
-    pub time_table: HashMap<u32, u32>,
+/// A job execution schedule for a single machine with possible preemptions, assigning to every job one or multiple execution times.
+/// If a job is assigned multiple execution times, then it was preempted by some other job in between.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct JobSchedule {
+    pub jobs: Vec<Job>,
+    /// For every time a job is started or resumed, this contains an entry with the time and the job's position in [job_list].
+    pub timetable: Vec<(u32, usize)>,
 }
 
-impl PartTimeSchrageJobTable {
-    pub fn c_max_wip(&self) -> u32 {
-        let mut end_times = vec![0; self.job_list.jobs.len()];
-        let mut s = 0;
-        let mut sums = vec![0; self.job_list.jobs.len()];
-
-        for (i, job) in self.job_list.jobs.iter().enumerate() {
-            if job.delivery_time > s {
-                s = job.delivery_time + job.processing_time;
-            } else {
-                s += job.processing_time;
-            }
-            end_times[i] = s;
+impl JobSchedule {
+    /// compute the makespan of the schedule, i.e., the time at which all jobs are completed
+    pub fn c_max(&self) -> u32 {
+        let mut makespan = 0;
+        let mut processing_times_remaining : Vec<u32> = self.jobs.iter().map(|job| job.processing_time).collect();
+        let mut iter = self.timetable.iter();
+        let (mut prev_time, mut prev_index) = match iter.next() {
+            Some(x) => *x,
+            None => return 0,
+        };
+        for (time, index) in iter {
+            makespan = max(
+                makespan,
+                prev_time + processing_times_remaining[prev_index] + self.jobs[prev_index].cooldown_time
+            );
+            processing_times_remaining[prev_index] = 
+                processing_times_remaining[prev_index].checked_sub(time - prev_time).unwrap_or(0);
+            prev_time = *time;
+            prev_index = *index;
         }
-
-        for (i, job) in self.job_list.jobs.iter().enumerate() {
-            sums[i] = job.cooldown_time + end_times[i];
-        }
-        *sums.iter().max().unwrap()
+        makespan = max(
+            makespan,
+            prev_time + processing_times_remaining[prev_index] + self.jobs[prev_index].cooldown_time
+        );
+        makespan
     }
 }
 
@@ -239,5 +248,43 @@ mod tests {
         };
         let result = js.c_max();
         assert_eq!(result, 1399);
+    }
+
+    #[test]
+    fn test_schedule_c_max_with_gap() {
+        let jobs = vec![
+            Job::new(0, 14, 20), // 0
+            Job::new(5, 8, 7),   // 1
+            Job::new(42, 10, 5), // 2
+        ];
+        let timetable = vec![
+            (0, 0),
+            (5, 1),
+            (13, 0),
+            (42, 2),
+        ];
+        let schedule = JobSchedule{
+            jobs,
+            timetable,
+        };
+        assert_eq!(schedule.c_max(), 42+10+5);
+    }
+
+    #[test]
+    fn test_schedule_c_max_with_preemption() {
+        let jobs = vec![
+            Job::new(3, 20, 0), // 0
+            Job::new(5, 8, 7),   // 1
+        ];
+        let timetable = vec![
+            (3, 0),
+            (16, 1),
+            (24, 0),
+        ];
+        let schedule = JobSchedule{
+            jobs,
+            timetable,
+        };
+        assert_eq!(schedule.c_max(), 16+8+7);
     }
 }
