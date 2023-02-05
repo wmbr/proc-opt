@@ -3,7 +3,7 @@ use std::{fmt, vec};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Job {
-    pub delivery_time: u32,   // r
+    pub delivery_time: u32,   // r, commonly referred to as "release time"
     pub processing_time: u32, // p
     pub cooldown_time: u32,   // q
 }

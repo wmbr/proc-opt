@@ -4,6 +4,8 @@ use std::{cmp, vec};
 pub mod jobs;
 
 /// Schrage algorithm.
+/// Schedules jobs on a single machine by a heuristic that attempts to minimze the makespan.
+/// Runs in O(n log n) time for n jobs.
 ///
 /// # Arguments
 ///
