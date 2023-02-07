@@ -1,12 +1,15 @@
-//! Implements Schrage and Part Time Schrage algorithms.
+//! Implements Schrage's algorithm (with and without preemptions).
 //!
-//! The Schrage algorithm is a meta-heuristic algorithm that tries to optimize
-//! scheduling of different processes. Using the Graham's notation the problem
+//! Schrage's algorithm is a heuristic algorithm that tries to optimize
+//! scheduling of tasks on a single machine. Using Graham's notation the problem
 //! can be written as:
 //! $$ 1|r_{j}, q_{j}|C_{max} $$
 //!
-//! It tried to optimize a set of jobs using the greedy-algorithm method by
-//! iterating over the jobs and time and first choosing jobs that are available at the moment given their readiness time (`r`) and choosing the one with the highest value of cooldown time (`q`).
+//! It uses a greedy strategy of always scheduling jobs as early as possible.
+//! If multiple jobs are available to be scheduled, then it gives priority to jobs 
+//! with higher cooldown times (`q`) (or higher processing times (`p`) in case of ties).
+//!
+//! In the case where preemptions are allowed, the output can be proven to always be an optimal solution.
 //!
 //! <div align="center">
 //!
@@ -69,7 +72,7 @@ impl PartialEq for SchrageJob {
     }
 }
 
-/// Schrage algorithm.
+/// Schrage's algorithm.
 /// Schedules jobs on a single machine by a heuristic that attempts to minimze the makespan.
 /// Runs in O(n log n) time for n jobs.
 ///
@@ -147,11 +150,9 @@ pub fn schrage(mut jobs: Vec<Job>) -> JobList {
     pi
 }
 
-/// Part time Schrage algorithm.
-///
-/// # Panics
-///
-/// Panics if empty job list.
+/// Schrage's algorithm with preemptions.
+/// Schedules jobs on a single machine with preemptions in a way which minimzes the makespan.
+/// Runs in O(n log n) time for n jobs.
 ///
 /// # Example
 ///
