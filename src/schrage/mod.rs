@@ -36,8 +36,38 @@
 //!
 //!
 
-use crate::jobs::{Job, JobList};
+use crate::jobs::{Job, JobList, JobSchedule};
 use std::{cmp, vec};
+use std::collections::BinaryHeap;
+
+#[derive(Eq)]
+struct SchrageJob {
+    pub job: Job,
+}
+
+impl Ord for SchrageJob {
+    // Order according to ascending priority,
+    // i.e. by ascending cooldown time, using processing time as tiebreaker.
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        if self.job.cooldown_time == other.job.cooldown_time {
+            self.job.processing_time.cmp(&other.job.processing_time)
+        } else {
+            self.job.cooldown_time.cmp(&other.job.cooldown_time)
+        }
+    }
+}
+
+impl PartialOrd for SchrageJob {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for SchrageJob {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == cmp::Ordering::Equal
+    }
+}
 
 /// Schrage algorithm.
 /// Schedules jobs on a single machine by a heuristic that attempts to minimze the makespan.
@@ -65,60 +95,54 @@ use std::{cmp, vec};
 ///         Job::new(30, 2, 0),  // 7
 ///     ],
 /// };
-/// let js = JobList {
-///     jobs: vec![
-///         Job::new(10, 5, 7),  // 1
-///         Job::new(13, 6, 26), // 2
-///         Job::new(11, 7, 24), // 3
-///         Job::new(20, 4, 21), // 4
-///         Job::new(30, 3, 8),  // 5
-///         Job::new(0, 6, 17),  // 6
-///         Job::new(30, 2, 0),  // 7
-///     ],
-/// };
-/// let result = schrage(&js);
+/// let js = vec![
+///     Job::new(10, 5, 7),  // 1
+///     Job::new(13, 6, 26), // 2
+///     Job::new(11, 7, 24), // 3
+///     Job::new(20, 4, 21), // 4
+///     Job::new(30, 3, 8),  // 5
+///     Job::new(0, 6, 17),  // 6
+///     Job::new(30, 2, 0),  // 7
+/// ];
+/// let result = schrage(js);
 /// assert_eq!(result, expected_result);
 /// assert_eq!(result.c_max(), 53);
 /// ```
-pub fn schrage(jobs: &JobList) -> JobList {
-    // N
-    // A list of jobs to be completed
-    let mut shortest_delivery_jobs = JobList::new(jobs.sorted_by_delivery_time());
-    // G
-    // A list of jobs that in a current moment are ready to run
-    let mut ready_to_run = JobList::new(Vec::new());
+pub fn schrage(mut jobs: Vec<Job>) -> JobList {
+    // sort by descending delivery time
+    // because we want to pop the jobs with lowest delivery time first
+    jobs.sort_unstable_by_key(|x| cmp::Reverse(x.delivery_time));
+    // A list of jobs that in a current moment are ready to run, sorted by descending priority
+    let mut ready_to_run = BinaryHeap::new();
     // Time tracking variable
     let mut t: u32 = 0;
     // The final sequence in which the jobs should be run
     let mut pi: JobList = JobList::new(Vec::new());
 
     // Iterate over all of the jobs until we ran out of them
-    while !shortest_delivery_jobs.jobs.is_empty() || !ready_to_run.jobs.is_empty() {
+    while !jobs.is_empty() || !ready_to_run.is_empty() {
         // Find all jobs that are available
-        while !shortest_delivery_jobs.jobs.is_empty()
-            && shortest_delivery_jobs.jobs[0].delivery_time <= t
+        while !jobs.is_empty()
+            && jobs.last().unwrap().delivery_time <= t
         {
-            ready_to_run
-                .jobs
-                .push(shortest_delivery_jobs.jobs.remove(0));
+            ready_to_run.push(
+                SchrageJob{ job: jobs.pop().unwrap() }
+            );
         }
         // If there are jobs that are ready to run schedule them
-        if !ready_to_run.jobs.is_empty() {
-            let max_cooldown_time = ready_to_run.jobs.iter().map(|job| job.cooldown_time).max().unwrap();
-            let index_to_run = ready_to_run.jobs.iter().enumerate()
-                .filter(|(_i, job)| job.cooldown_time == max_cooldown_time)
-                .max_by_key(|(_i, job)| job.processing_time)
-                .map(|(i, _job)| i).unwrap();
-
-            let job_to_run = ready_to_run.jobs.swap_remove(index_to_run);
-            // Add a job to the final sequence
-            pi.jobs.push(job_to_run);
-            t += job_to_run.processing_time;
-        } else {
-            // If there aren't any jobs that can be run,
-            // skip to when the nearest job is available
-            t = shortest_delivery_jobs.jobs[0].delivery_time;
-        }
+        match ready_to_run.pop() {
+            Some(sjob) => {
+                // Add a job to the final sequence
+                pi.jobs.push(sjob.job);
+                t += sjob.job.processing_time;
+            },
+            None => {
+                // If there aren't any jobs that can be run,
+                // skip to when the nearest job is available.
+                // Note that ready_to_run cannot be empty at this point.
+                t = jobs.last().unwrap().delivery_time;
+            }
+        };
     }
     pi
 }
@@ -213,18 +237,16 @@ mod tests {
                 Job::new(30, 2, 0),  // 7
             ],
         };
-        let js = JobList {
-            jobs: vec![
-                Job::new(10, 5, 7),  // 1
-                Job::new(13, 6, 26), // 2
-                Job::new(11, 7, 24), // 3
-                Job::new(20, 4, 21), // 4
-                Job::new(30, 3, 8),  // 5
-                Job::new(0, 6, 17),  // 6
-                Job::new(30, 2, 0),  // 7
-            ],
-        };
-        let result = schrage(&js);
+        let js = vec![
+            Job::new(10, 5, 7),  // 1
+            Job::new(13, 6, 26), // 2
+            Job::new(11, 7, 24), // 3
+            Job::new(20, 4, 21), // 4
+            Job::new(30, 3, 8),  // 5
+            Job::new(0, 6, 17),  // 6
+            Job::new(30, 2, 0),  // 7
+        ];
+        let result = schrage(js);
         assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 53);
     }
@@ -241,17 +263,15 @@ mod tests {
                 Job::new(4, 7, 1), // 6
             ],
         };
-        let js = JobList {
-            jobs: vec![
-                Job::new(1, 5, 9), // 1
-                Job::new(4, 5, 4), // 2
-                Job::new(1, 4, 6), // 3
-                Job::new(7, 3, 3), // 4
-                Job::new(3, 6, 8), // 5
-                Job::new(4, 7, 1), // 6
-            ],
-        };
-        let result = schrage(&js);
+        let js = vec![
+            Job::new(1, 5, 9), // 1
+            Job::new(4, 5, 4), // 2
+            Job::new(1, 4, 6), // 3
+            Job::new(7, 3, 3), // 4
+            Job::new(3, 6, 8), // 5
+            Job::new(4, 7, 1), // 6
+        ];
+        let result = schrage(js);
         assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 32);
     }
@@ -282,31 +302,29 @@ mod tests {
                 Job::new(233, 68, 23),  // 8
             ],
         };
-        let js = JobList {
-            jobs: vec![
-                Job::new(162, 52, 241), // 1
-                Job::new(103, 68, 470), // 2
-                Job::new(39, 38, 340),  // 3
-                Job::new(394, 34, 400), // 4
-                Job::new(15, 86, 700),  // 5
-                Job::new(144, 73, 536), // 6
-                Job::new(51, 52, 403),  // 7
-                Job::new(233, 68, 23),  // 8
-                Job::new(183, 17, 641), // 9
-                Job::new(728, 18, 640), // 10
-                Job::new(667, 80, 92),  // 11
-                Job::new(57, 21, 76),   // 12
-                Job::new(35, 37, 386),  // 13
-                Job::new(567, 71, 618), // 14
-                Job::new(226, 5, 629),  // 15
-                Job::new(162, 80, 575), // 16
-                Job::new(588, 45, 632), // 17
-                Job::new(556, 23, 79),  // 18
-                Job::new(715, 8, 93),   // 19
-                Job::new(598, 45, 200), // 20
-            ],
-        };
-        let result = schrage(&js);
+        let js = vec![
+            Job::new(162, 52, 241), // 1
+            Job::new(103, 68, 470), // 2
+            Job::new(39, 38, 340),  // 3
+            Job::new(394, 34, 400), // 4
+            Job::new(15, 86, 700),  // 5
+            Job::new(144, 73, 536), // 6
+            Job::new(51, 52, 403),  // 7
+            Job::new(233, 68, 23),  // 8
+            Job::new(183, 17, 641), // 9
+            Job::new(728, 18, 640), // 10
+            Job::new(667, 80, 92),  // 11
+            Job::new(57, 21, 76),   // 12
+            Job::new(35, 37, 386),  // 13
+            Job::new(567, 71, 618), // 14
+            Job::new(226, 5, 629),  // 15
+            Job::new(162, 80, 575), // 16
+            Job::new(588, 45, 632), // 17
+            Job::new(556, 23, 79),  // 18
+            Job::new(715, 8, 93),   // 19
+            Job::new(598, 45, 200), // 20
+        ];
+        let result = schrage(js);
         assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 1399);
     }
@@ -327,21 +345,19 @@ mod tests {
                 Job::new(90, 2, 13),   // 7
             ],
         };
-        let js = JobList {
-            jobs: vec![
-                Job::new(52, 1, 56),   // 1
-                Job::new(70, 4, 93),   // 2
-                Job::new(112, 22, 79), // 3
-                Job::new(5, 14, 125),  // 4
-                Job::new(8, 16, 114),  // 5
-                Job::new(71, 7, 71),   // 6
-                Job::new(90, 2, 13),   // 7
-                Job::new(2, 20, 88),   // 8
-                Job::new(52, 20, 56),  // 9
-                Job::new(9, 28, 94),   // 10
-            ],
-        };
-        let result = schrage(&js);
+        let js = vec![
+            Job::new(52, 1, 56),   // 1
+            Job::new(70, 4, 93),   // 2
+            Job::new(112, 22, 79), // 3
+            Job::new(5, 14, 125),  // 4
+            Job::new(8, 16, 114),  // 5
+            Job::new(71, 7, 71),   // 6
+            Job::new(90, 2, 13),   // 7
+            Job::new(2, 20, 88),   // 8
+            Job::new(52, 20, 56),  // 9
+            Job::new(9, 28, 94),   // 10
+        ];
+        let result = schrage(js);
         assert_eq!(result, expected_result);
         assert_eq!(result.c_max(), 213);
     }
