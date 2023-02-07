@@ -220,8 +220,6 @@ pub fn part_time_schrage(jobs: &JobList) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::jobs::{Job, JobList};
-
     use super::*;
 
     #[test]

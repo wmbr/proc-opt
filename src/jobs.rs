@@ -12,7 +12,7 @@
 //!
 //!
 //!
-use std::{fmt, vec, cmp::max};
+use std::{fmt, cmp::max};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Job {
