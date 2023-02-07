@@ -37,7 +37,7 @@
 //!
 
 use crate::jobs::{Job, JobList, JobSchedule};
-use std::{cmp, vec};
+use std::cmp;
 use std::collections::BinaryHeap;
 
 #[derive(Eq)]
@@ -156,66 +156,87 @@ pub fn schrage(mut jobs: Vec<Job>) -> JobList {
 /// # Example
 ///
 /// ```
-/// use proc_opt::jobs::{JobList, Job};
-/// use proc_opt::schrage::part_time_schrage;
-/// let js = JobList::new(vec![
+/// use proc_opt::jobs::{JobSchedule, Job};
+/// use proc_opt::schrage::schrage_preemptive;
+/// let js = vec![
 ///     Job::new(0, 27, 78),
 ///     Job::new(140, 7, 67),
 ///     Job::new(14, 36, 54),
 ///     Job::new(133, 76, 5),
-/// ]);
-/// let result = part_time_schrage(&js);
-/// assert_eq!(result, 221)
+/// ];
+/// let expected_result = JobSchedule{
+///     jobs: vec![
+///         Job::new(0, 27, 78),  // 0
+///         Job::new(14, 36, 54), // 1
+///         Job::new(133, 76, 5), // 2
+///         Job::new(140, 7, 67), // 3
+///     ],
+///     timetable: vec![
+///         (0, 0),   // start job 0 at time 0
+///         (27, 1),  // start job 1 at time 27
+///         (133, 2), // start job 2 at time 133
+///         (140, 3), // start job 3 at time 140 (preempting job 2)
+///         (147, 2), // continue job 2
+///     ],
+/// };
+/// let result = schrage_preemptive(js);
+/// assert_eq!(result, expected_result)
 /// ```
-pub fn part_time_schrage(jobs: &JobList) -> u32 {
-    // N
-    let mut shortest_delivery_jobs = JobList::new(jobs.sorted_by_delivery_time());
-    // G
-    let mut ready_to_run = JobList::new(Vec::new());
-    let mut current_job = Job::new(0, 0, 0);
+pub fn schrage_preemptive(mut jobs: Vec<Job>) -> JobSchedule {
+    // sort by ascending delivery time
+    jobs.sort_unstable_by_key(|x| x.delivery_time);
+    // A list of jobs that in a current moment are ready to run, sorted by descending priority
+    // Together with each job we store its index (in `jobs`).
+    let mut ready_to_run = BinaryHeap::new();
+    // Time tracking variable
     let mut t: u32 = 0;
-    let mut c_max: u32 = 0;
-    let mut pi: JobList = JobList { jobs: Vec::new() };
-
-    while !shortest_delivery_jobs.jobs.is_empty() || !ready_to_run.jobs.is_empty() {
-        while !shortest_delivery_jobs.jobs.is_empty()
-            && shortest_delivery_jobs.jobs[0].delivery_time <= t
+    // The final timetable
+    let mut timetable: Vec<(u32, usize)> = Vec::new();
+    // index of the next job to become available
+    let mut job_index = 0;
+    // Iterate over all of the jobs until we ran out of them
+    while job_index < jobs.len() || !ready_to_run.is_empty() {
+        // Find all jobs that are available
+        while job_index < jobs.len()
+            && jobs[job_index].delivery_time <= t
         {
-            ready_to_run
-                .jobs
-                .append(&mut vec![shortest_delivery_jobs.jobs[0]]);
-            let next_job = shortest_delivery_jobs.jobs.remove(0);
-
-            if next_job.cooldown_time > current_job.cooldown_time {
-                current_job.processing_time = t - next_job.delivery_time;
-                t = next_job.delivery_time;
-
-                if current_job.processing_time > 0 {
-                    ready_to_run.jobs.append(&mut vec![current_job]);
-                    ready_to_run.jobs = ready_to_run.sorted_by_delivery_time().clone();
+            ready_to_run.push((
+                SchrageJob{ job: jobs[job_index] },
+                job_index,
+            ));
+            job_index += 1;
+        }
+        // If there are jobs that are ready to run schedule them
+        match ready_to_run.pop() {
+            Some((mut sjob, i)) => {
+                // Schedule that job unless it is already scheduled
+                if timetable.is_empty() || timetable.last().unwrap().1 != i {
+                    timetable.push((t, i));
                 }
+                t += sjob.job.processing_time;
+                // check if a new job arrives before this one is done
+                if job_index < jobs.len() {
+                    let next_delivery = jobs[job_index].delivery_time;
+                    if next_delivery < t {
+                        // add this job back to the heap with the remaining processing time
+                        sjob.job.processing_time = t - next_delivery;
+                        ready_to_run.push((sjob, i));
+                        t = next_delivery;
+                    }
+                }
+            },
+            None => {
+                // If there aren't any jobs that can be run,
+                // skip to when the nearest job is available
+                // note that job_index < jobs.len() is guaranteed here
+                t = jobs[job_index].delivery_time;
             }
-        }
-
-        if !ready_to_run.jobs.is_empty() {
-            let cooldown_times = ready_to_run.sorted_by_cooldown_time();
-            let max_cooldown_time = cooldown_times.last().unwrap();
-            let position = ready_to_run
-                .jobs
-                .iter()
-                .position(|&n| n.cooldown_time == max_cooldown_time.cooldown_time)
-                .unwrap();
-            current_job = ready_to_run.jobs.remove(position);
-
-            // Add a job to the final sequence
-            pi.jobs.push(*max_cooldown_time);
-            t += max_cooldown_time.processing_time;
-            c_max = cmp::max(t + max_cooldown_time.cooldown_time, c_max)
-        } else {
-            t = shortest_delivery_jobs.jobs[0].delivery_time;
-        }
+        };
     }
-    c_max
+    JobSchedule{
+        jobs,
+        timetable,
+    }
 }
 
 #[cfg(test)]
@@ -386,20 +407,20 @@ mod tests {
     }
 
     #[test]
-    fn test_part_time_schrage1() {
-        let js = JobList::new(vec![
+    fn test_schrage_preemptive1() {
+        let js = vec![
             Job::new(0, 27, 78),
             Job::new(140, 7, 67),
             Job::new(14, 36, 54),
             Job::new(133, 76, 5),
-        ]);
-        let result = part_time_schrage(&js);
-        assert_eq!(result, 221)
+        ];
+        let result = schrage_preemptive(js);
+        assert_eq!(result.c_max(), 221)
     }
 
     #[test]
-    fn test_part_time_schrage2() {
-        let js = JobList::new(vec![
+    fn test_schrage_preemptive2() {
+        let js = vec![
             Job::new(8, 68, 984),
             Job::new(747, 60, 1241),
             Job::new(811, 78, 56),
@@ -450,14 +471,14 @@ mod tests {
             Job::new(6, 24, 707),
             Job::new(507, 31, 1294),
             Job::new(638, 98, 1528),
-        ]);
-        let result = part_time_schrage(&js);
-        assert_eq!(result, 3820);
+        ];
+        let result = schrage_preemptive(js);
+        assert_eq!(result.c_max(), 3820);
     }
 
     #[test]
-    fn test_part_time_schrage3() {
-        let js = JobList::new(vec![
+    fn test_schrage_preemptive3() {
+        let js = vec![
             Job::new(162, 52, 241),
             Job::new(103, 68, 470),
             Job::new(39, 38, 340),
@@ -478,14 +499,14 @@ mod tests {
             Job::new(556, 23, 79),
             Job::new(715, 8, 93),
             Job::new(598, 45, 200),
-        ]);
-        let result = part_time_schrage(&js);
-        assert_eq!(result, 1386);
+        ];
+        let result = schrage_preemptive(js);
+        assert_eq!(result.c_max(), 1386);
     }
 
     #[test]
-    fn test_part_time_schrage4() {
-        let js = JobList::new(vec![
+    fn test_schrage_preemptive4() {
+        let js = vec![
             Job::new(219, 5, 276),
             Job::new(84, 13, 103),
             Job::new(336, 35, 146),
@@ -496,8 +517,8 @@ mod tests {
             Job::new(181, 93, 97),
             Job::new(263, 13, 168),
             Job::new(79, 60, 235),
-        ]);
-        let result = part_time_schrage(&js);
-        assert_eq!(result, 641);
+        ];
+        let result = schrage_preemptive(js);
+        assert_eq!(result.c_max(), 641);
     }
 }
